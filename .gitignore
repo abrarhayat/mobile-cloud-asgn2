@@ -12,3 +12,7 @@ submission-packages
 videos
 bin
 build
+.idea
+gradle
+gradlew
+gradlew.bat
