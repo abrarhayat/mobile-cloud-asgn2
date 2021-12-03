@@ -1,6 +1,8 @@
 package org.magnum.mobilecloud.video.controller;
 
+import java.security.Principal;
 import java.util.Collection;
+import java.util.Set;
 
 import org.magnum.mobilecloud.video.client.VideoSvcApi;
 import org.magnum.mobilecloud.video.repository.Video;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import com.google.common.collect.Lists;
+
+import javax.servlet.http.HttpServletResponse;
 
 import static org.magnum.mobilecloud.video.client.VideoSvcApi.TITLE_PARAMETER;
 import static org.magnum.mobilecloud.video.client.VideoSvcApi.VIDEO_SVC_PATH;
@@ -28,14 +32,40 @@ public class VideoController {
     }
 
     @RequestMapping(value = VIDEO_SVC_PATH + "/{id}/like", method = RequestMethod.POST)
-    public Void likeVideo(long id) {
-        videos.findById(id);
-        return null;
+    public void likeVideo(@PathVariable long id, Principal principal, HttpServletResponse response) {
+        Video video = videos.findById(id);
+        if (video == null) {
+            response.setStatus(404);
+            return;
+        }
+        if (video.getLikedBy().contains(principal.getName())) {
+            response.setStatus(400); //cannot like twice
+            return;
+        }
+        Set<String> updatedLikedBy = video.getLikedBy();
+        updatedLikedBy.add(principal.getName());
+        video.setLikedBy(updatedLikedBy);
+        video.setLikes(video.getLikes() + 1);
+        videos.save(video);
     }
 
     @RequestMapping(value = VIDEO_SVC_PATH + "/{id}/unlike", method = RequestMethod.POST)
-    public Void unlikeVideo(long id) {
-        return null;
+    public @ResponseBody
+    void unlikeVideo(@PathVariable long id, Principal principal, HttpServletResponse response) {
+        Video video = videos.findById(id);
+        if (video == null) {
+            response.setStatus(404);
+            return;
+        }
+        if (!video.getLikedBy().contains(principal.getName())) {
+            response.setStatus(400); //must have liked before to unlike
+            return;
+        }
+        video.setLikes(video.getLikes() - 1);
+        Set<String> updatedLikedBy = video.getLikedBy();
+        updatedLikedBy.remove(principal.getName());
+        video.setLikedBy(updatedLikedBy);
+        videos.save(video);
     }
 
     @RequestMapping(value = VIDEO_SVC_PATH, method = RequestMethod.GET)
@@ -60,5 +90,4 @@ public class VideoController {
     Collection<Video> findByDurationLessThan(@RequestParam long duration) {
         return videos.findByDurationLessThan(duration);
     }
-
 }
